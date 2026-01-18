@@ -4,7 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-YouTube Bulk URL Scraper is a Chrome extension (Manifest v3) that extracts video URLs from YouTube search results pages via auto-scrolling. The UI is French-localized.
+YouTube Bulk URL Scraper is a Chrome extension (Manifest v3) with two modes:
+1. **Scraper mode** (search pages): Extract video URLs via auto-scrolling
+2. **Transcript mode** (video pages): Extract video transcripts/subtitles
+
+The UI is French-localized.
 
 ## Development
 
@@ -20,26 +24,26 @@ YouTube Bulk URL Scraper is a Chrome extension (Manifest v3) that extracts video
 ```
 popup.html/js  ←→  content.js (via chrome.runtime messaging)
      ↓                    ↓
-   UI layer          DOM extraction on YouTube
+   UI layer          DOM/data extraction on YouTube
 ```
 
-**Message flow:**
-1. User clicks "Lancer l'extraction" in popup
-2. popup.js sends `{action: "SCRAPE_URLS", limit: 50}` to content.js
-3. content.js auto-scrolls, extracts from `ytd-video-renderer` elements
-4. Returns `{success, videos: [{url, title, dateText, timestamp}]}`
+**popup.js** detects page type on load and shows appropriate UI section.
 
-**content.js** runs only on `*://*.youtube.com/results*` (search pages). It:
-- Queries `ytd-video-renderer` elements for video data
-- Auto-scrolls with 1.5s intervals until limit reached or no new content (3 consecutive attempts)
-- Parses French/English relative dates ("il y a 2 jours") to timestamps for sorting
-- Deduplicates by URL, returns newest-first
+### Scraper Mode (search pages)
+- Action: `{action: "SCRAPE_URLS", limit: 50}`
+- content.js auto-scrolls, extracts from `ytd-video-renderer` elements
+- Returns `{status: "DONE", data: [{url, title, dateText, timestamp}]}`
 
-**popup.js** handles UI state, validates the page is a YouTube search, and manages clipboard copy.
+### Transcript Mode (video pages)
+- Action: `{action: "GET_TRANSCRIPT"}`
+- content.js parses `ytInitialPlayerResponse` for caption track URL
+- Fetches captions in JSON format, parses segments
+- Returns `{success, title, language, languageName, transcript: [{timestamp, text}]}`
 
 ## Key Implementation Details
 
-- Date parsing supports French (`il y a`, `jours`, `semaines`) and English (`ago`, `days`, `weeks`)
-- URLs are cleaned by stripping query params after first `&`
-- "No change" detection: stops scrolling after 3 scroll cycles with no new videos
-- Manifest v3 with minimal permissions: `activeTab`, `scripting`
+- **Date parsing**: French (`il y a`, `jours`) and English (`ago`, `days`)
+- **Transcript extraction**: Prefers French subtitles, falls back to first available
+- **Caption format**: Uses `fmt=json3` for structured JSON response
+- **URL cleaning**: Strips query params after first `&`
+- **Manifest v3** with minimal permissions: `activeTab`, `scripting`

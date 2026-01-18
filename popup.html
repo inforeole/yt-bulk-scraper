@@ -4,14 +4,14 @@
   <meta charset="UTF-8">
   <style>
     body {
-      width: 600px; /* Élargissement de la fenêtre */
+      width: 600px;
       padding: 16px;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       background-color: #f9f9f9;
       color: #333;
     }
     h3 { margin-top: 0; font-size: 16px; margin-bottom: 12px; }
-    
+
     .btn {
       width: 100%;
       padding: 10px;
@@ -22,47 +22,44 @@
       cursor: pointer;
       margin-bottom: 8px;
     }
-    #startBtn { background-color: #0f0f0f; color: #fff; }
-    #startBtn:disabled { background-color: #ccc; cursor: not-allowed; }
-    
-    #copyBtn { 
-      background-color: #065fd4; 
-      color: white; 
-      display: none;
-    }
+    .btn-primary { background-color: #0f0f0f; color: #fff; }
+    .btn-primary:disabled { background-color: #ccc; cursor: not-allowed; }
+    .btn-secondary { background-color: #065fd4; color: white; }
 
     #status {
       margin: 8px 0;
       font-size: 12px;
       text-align: center;
       color: #666;
-      height: 1.5em;
+      min-height: 1.5em;
     }
 
+    .hidden { display: none !important; }
+
+    /* Section Scraper */
     #videoList {
-      max-height: 400px; /* Liste plus haute */
+      max-height: 400px;
       overflow-y: auto;
       background: white;
       border: 1px solid #ddd;
       border-radius: 6px;
-      display: none;
     }
 
     .video-item {
       display: flex;
-      align-items: flex-start; /* Alignement en haut pour gérer les titres longs */
+      align-items: flex-start;
       padding: 10px;
       border-bottom: 1px solid #eee;
       font-size: 13px;
     }
     .video-item:last-child { border-bottom: none; }
-    
-    .video-item input { 
-      margin-right: 12px; 
+
+    .video-item input {
+      margin-right: 12px;
       margin-top: 3px;
-      cursor: pointer; 
+      cursor: pointer;
     }
-    
+
     .video-content {
       flex-grow: 1;
       display: flex;
@@ -73,8 +70,7 @@
     .video-title {
       font-weight: 500;
       color: #0f0f0f;
-      /* Permet au texte de passer à la ligne */
-      white-space: normal; 
+      white-space: normal;
       word-break: break-word;
     }
 
@@ -85,32 +81,93 @@
       min-width: 80px;
       text-align: right;
     }
-    
+
     .video-item:hover { background-color: #f0f0f0; }
+
+    /* Section Transcript */
+    #transcriptText {
+      width: 100%;
+      height: 350px;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 13px;
+      line-height: 1.5;
+      resize: vertical;
+      box-sizing: border-box;
+    }
+
+    .toggle-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+
+    .toggle-container input {
+      cursor: pointer;
+    }
+
+    .info-box {
+      background: #e3f2fd;
+      border: 1px solid #90caf9;
+      border-radius: 6px;
+      padding: 10px;
+      margin-bottom: 8px;
+      font-size: 12px;
+      color: #1565c0;
+    }
   </style>
 </head>
 <body>
-  <h3>YouTube Bulk Scraper (Trié par date)</h3>
-  
-  <button id="startBtn" class="btn">Lancer l'extraction (50)</button>
+  <h3 id="pageTitle">YouTube Tools</h3>
 
-  <div id="filterContainer" style="display: none; margin-bottom: 8px;">
-    <label for="dateFilter" style="font-size: 12px; color: #606060;">Filtrer par date :</label>
-    <select id="dateFilter" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; margin-top: 4px;">
-      <option value="all">Toutes les vidéos</option>
-      <option value="week">Moins d'1 semaine</option>
-      <option value="month">Moins d'1 mois</option>
-      <option value="6months">Moins de 6 mois</option>
-      <option value="year" selected>Moins d'1 an</option>
-    </select>
+  <!-- Section Scraper (pages de recherche) -->
+  <div id="scraperSection" class="hidden">
+    <button id="startBtn" class="btn btn-primary">Lancer l'extraction (50)</button>
+
+    <div id="filterContainer" class="hidden" style="margin-bottom: 8px;">
+      <label for="dateFilter" style="font-size: 12px; color: #606060;">Filtrer par date :</label>
+      <select id="dateFilter" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; margin-top: 4px;">
+        <option value="all">Toutes les vidéos</option>
+        <option value="week">Moins d'1 semaine</option>
+        <option value="month">Moins d'1 mois</option>
+        <option value="6months">Moins de 6 mois</option>
+        <option value="year" selected>Moins d'1 an</option>
+      </select>
+    </div>
+
+    <button id="copyBtn" class="btn btn-secondary hidden">Copier la sélection</button>
+    <div id="videoList" class="hidden"></div>
   </div>
 
-  <button id="copyBtn" class="btn">Copier la sélection</button>
-  
-  <div id="status">Prêt</div>
-  
-  <div id="videoList"></div>
-  
+  <!-- Section Transcript (pages vidéo) -->
+  <div id="transcriptSection" class="hidden">
+    <button id="transcriptBtn" class="btn btn-primary">Extraire le transcript</button>
+
+    <div id="transcriptResult" class="hidden">
+      <div id="transcriptInfo" class="info-box"></div>
+
+      <div class="toggle-container">
+        <input type="checkbox" id="showTimestamps" checked>
+        <label for="showTimestamps">Afficher les timestamps</label>
+      </div>
+
+      <textarea id="transcriptText" readonly></textarea>
+      <button id="copyTranscriptBtn" class="btn btn-secondary">Copier le transcript</button>
+    </div>
+  </div>
+
+  <!-- Section erreur (autre page) -->
+  <div id="errorSection" class="hidden">
+    <div class="info-box" style="background: #fff3e0; border-color: #ffcc80; color: #e65100;">
+      Allez sur une page de recherche YouTube ou sur une vidéo pour utiliser cette extension.
+    </div>
+  </div>
+
+  <div id="status">Chargement...</div>
+
   <script src="popup.js"></script>
 </body>
 </html>

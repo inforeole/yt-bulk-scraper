@@ -1,16 +1,22 @@
 {
   "manifest_version": 3,
   "name": "YouTube Bulk URL Scraper",
-  "version": "1.1",
-  "description": "Scrapes video URLs from YouTube search results via auto-scroll.",
+  "version": "1.2",
+  "description": "Scrapes video URLs from YouTube search results and extracts transcripts from videos.",
   "permissions": ["activeTab", "scripting"],
   "action": {
     "default_popup": "popup.html"
   },
   "content_scripts": [
     {
-      "matches": ["*://*.youtube.com/results*"],
+      "matches": ["*://*.youtube.com/results*", "*://*.youtube.com/watch*"],
       "js": ["content.js"]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["inject.js"],
+      "matches": ["*://*.youtube.com/*"]
     }
   ]
 }

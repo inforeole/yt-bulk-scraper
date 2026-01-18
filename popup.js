@@ -1,5 +1,34 @@
 // popup.js
-let allVideos = []; // Stocke toutes les vidéos pour le filtrage
+
+let allVideos = [];
+let transcriptData = null;
+
+// Initialisation : détecter le type de page
+document.addEventListener('DOMContentLoaded', async () => {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const url = tab?.url || '';
+
+    const status = document.getElementById('status');
+    const pageTitle = document.getElementById('pageTitle');
+
+    if (url.includes('youtube.com/results')) {
+        // Page de recherche
+        pageTitle.textContent = 'YouTube Bulk Scraper';
+        document.getElementById('scraperSection').classList.remove('hidden');
+        status.textContent = 'Prêt';
+    } else if (url.includes('youtube.com/watch')) {
+        // Page vidéo
+        pageTitle.textContent = 'YouTube Transcript';
+        document.getElementById('transcriptSection').classList.remove('hidden');
+        status.textContent = 'Prêt';
+    } else {
+        // Autre page
+        document.getElementById('errorSection').classList.remove('hidden');
+        status.textContent = '';
+    }
+});
+
+// ============ SCRAPER ============
 
 document.getElementById('startBtn').addEventListener('click', async () => {
     const startBtn = document.getElementById('startBtn');
@@ -9,11 +38,11 @@ document.getElementById('startBtn').addEventListener('click', async () => {
     const listContainer = document.getElementById('videoList');
 
     listContainer.replaceChildren();
-    listContainer.style.display = 'none';
-    copyBtn.style.display = 'none';
-    filterContainer.style.display = 'none';
+    listContainer.classList.add('hidden');
+    copyBtn.classList.add('hidden');
+    filterContainer.classList.add('hidden');
     status.textContent = "Initialisation...";
-    
+
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
     if (!tab.url || !tab.url.includes("youtube.com/results")) {
@@ -34,16 +63,16 @@ document.getElementById('startBtn').addEventListener('click', async () => {
                 files: ['content.js']
             });
         } catch (e) { }
-        
+
         await new Promise(r => setTimeout(r, 500));
 
         const response = await chrome.tabs.sendMessage(tab.id, { action: "SCRAPE_URLS", limit: 50 });
-        
+
         if (response && response.status === "DONE") {
             allVideos = response.data;
-            filterContainer.style.display = 'block';
+            filterContainer.classList.remove('hidden');
             applyFilter();
-            copyBtn.style.display = 'block';
+            copyBtn.classList.remove('hidden');
         } else {
             throw new Error("Réponse vide");
         }
@@ -61,20 +90,18 @@ document.getElementById('startBtn').addEventListener('click', async () => {
 function renderList(videos) {
     const listContainer = document.getElementById('videoList');
     listContainer.replaceChildren();
-    listContainer.style.display = 'block';
+    listContainer.classList.remove('hidden');
 
     videos.forEach((video, index) => {
         const row = document.createElement('div');
         row.className = 'video-item';
-        
-        // Case à cocher
+
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
         checkbox.checked = true;
         checkbox.id = `vid-${index}`;
         checkbox.dataset.url = video.url;
-        
-        // Conteneur Texte (Titre + Date)
+
         const contentDiv = document.createElement('div');
         contentDiv.className = 'video-content';
 
@@ -89,10 +116,10 @@ function renderList(videos) {
 
         contentDiv.appendChild(label);
         contentDiv.appendChild(dateSpan);
-        
+
         row.appendChild(checkbox);
         row.appendChild(contentDiv);
-        
+
         listContainer.appendChild(row);
     });
 }
@@ -107,15 +134,13 @@ document.getElementById('copyBtn').addEventListener('click', () => {
     }
 
     navigator.clipboard.writeText(urls.join('\n')).then(() => {
-        const originalText = document.getElementById('copyBtn').textContent;
-        document.getElementById('copyBtn').textContent = "Copié !";
-        setTimeout(() => {
-            document.getElementById('copyBtn').textContent = originalText;
-        }, 2000);
+        const btn = document.getElementById('copyBtn');
+        const originalText = btn.textContent;
+        btn.textContent = "Copié !";
+        setTimeout(() => { btn.textContent = originalText; }, 2000);
     });
 });
 
-// Filtre par date
 document.getElementById('dateFilter').addEventListener('change', applyFilter);
 
 function applyFilter() {
@@ -123,7 +148,6 @@ function applyFilter() {
     const now = Date.now();
     const status = document.getElementById('status');
 
-    // Durées en millisecondes
     const durations = {
         week: 7 * 24 * 60 * 60 * 1000,
         month: 30 * 24 * 60 * 60 * 1000,
@@ -143,3 +167,83 @@ function applyFilter() {
     status.textContent = `${filteredVideos.length}/${allVideos.length} vidéos affichées`;
     status.style.color = "#2e7d32";
 }
+
+// ============ TRANSCRIPT ============
+
+document.getElementById('transcriptBtn').addEventListener('click', async () => {
+    const transcriptBtn = document.getElementById('transcriptBtn');
+    const status = document.getElementById('status');
+    const transcriptResult = document.getElementById('transcriptResult');
+
+    transcriptBtn.disabled = true;
+    transcriptBtn.textContent = "Extraction en cours...";
+    status.textContent = "Récupération du transcript...";
+    status.style.color = "#666";
+    transcriptResult.classList.add('hidden');
+
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+    try {
+        try {
+            await chrome.scripting.executeScript({
+                target: { tabId: tab.id },
+                files: ['content.js']
+            });
+        } catch (e) { }
+
+        await new Promise(r => setTimeout(r, 300));
+
+        const response = await chrome.tabs.sendMessage(tab.id, { action: "GET_TRANSCRIPT" });
+
+        if (response && response.success) {
+            transcriptData = response;
+            displayTranscript();
+            transcriptResult.classList.remove('hidden');
+
+            document.getElementById('transcriptInfo').textContent =
+                `${response.title} • Langue : ${response.languageName} • ${response.transcript.length} segments`;
+
+            status.textContent = "Transcript extrait avec succès";
+            status.style.color = "#2e7d32";
+        } else {
+            throw new Error(response?.error || "Erreur inconnue");
+        }
+
+    } catch (error) {
+        console.error(error);
+        status.textContent = error.message || "Erreur lors de l'extraction";
+        status.style.color = "#d32f2f";
+    } finally {
+        transcriptBtn.disabled = false;
+        transcriptBtn.textContent = "Extraire le transcript";
+    }
+});
+
+document.getElementById('showTimestamps').addEventListener('change', displayTranscript);
+
+function displayTranscript() {
+    if (!transcriptData) return;
+
+    const showTimestamps = document.getElementById('showTimestamps').checked;
+    const textarea = document.getElementById('transcriptText');
+
+    const text = transcriptData.transcript.map(item => {
+        if (showTimestamps) {
+            return `[${item.timestamp}] ${item.text}`;
+        }
+        return item.text;
+    }).join('\n');
+
+    textarea.value = text;
+}
+
+document.getElementById('copyTranscriptBtn').addEventListener('click', () => {
+    const textarea = document.getElementById('transcriptText');
+
+    navigator.clipboard.writeText(textarea.value).then(() => {
+        const btn = document.getElementById('copyTranscriptBtn');
+        const originalText = btn.textContent;
+        btn.textContent = "Copié !";
+        setTimeout(() => { btn.textContent = originalText; }, 2000);
+    });
+});
