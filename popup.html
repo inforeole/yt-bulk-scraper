@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      width: 600px; /* Élargissement de la fenêtre */
+      padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #f9f9f9;
+      color: #333;
+    }
+    h3 { margin-top: 0; font-size: 16px; margin-bottom: 12px; }
+    
+    .btn {
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-bottom: 8px;
+    }
+    #startBtn { background-color: #0f0f0f; color: #fff; }
+    #startBtn:disabled { background-color: #ccc; cursor: not-allowed; }
+    
+    #copyBtn { 
+      background-color: #065fd4; 
+      color: white; 
+      display: none;
+    }
+
+    #status {
+      margin: 8px 0;
+      font-size: 12px;
+      text-align: center;
+      color: #666;
+      height: 1.5em;
+    }
+
+    #videoList {
+      max-height: 400px; /* Liste plus haute */
+      overflow-y: auto;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      display: none;
+    }
+
+    .video-item {
+      display: flex;
+      align-items: flex-start; /* Alignement en haut pour gérer les titres longs */
+      padding: 10px;
+      border-bottom: 1px solid #eee;
+      font-size: 13px;
+    }
+    .video-item:last-child { border-bottom: none; }
+    
+    .video-item input { 
+      margin-right: 12px; 
+      margin-top: 3px;
+      cursor: pointer; 
+    }
+    
+    .video-content {
+      flex-grow: 1;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .video-title {
+      font-weight: 500;
+      color: #0f0f0f;
+      /* Permet au texte de passer à la ligne */
+      white-space: normal; 
+      word-break: break-word;
+    }
+
+    .video-date {
+      color: #606060;
+      font-size: 12px;
+      white-space: nowrap;
+      min-width: 80px;
+      text-align: right;
+    }
+    
+    .video-item:hover { background-color: #f0f0f0; }
+  </style>
+</head>
+<body>
+  <h3>YouTube Bulk Scraper (Trié par date)</h3>
+  
+  <button id="startBtn" class="btn">Lancer l'extraction (50)</button>
+
+  <div id="filterContainer" style="display: none; margin-bottom: 8px;">
+    <label for="dateFilter" style="font-size: 12px; color: #606060;">Filtrer par date :</label>
+    <select id="dateFilter" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; margin-top: 4px;">
+      <option value="all">Toutes les vidéos</option>
+      <option value="week">Moins d'1 semaine</option>
+      <option value="month">Moins d'1 mois</option>
+      <option value="6months">Moins de 6 mois</option>
+      <option value="year" selected>Moins d'1 an</option>
+    </select>
+  </div>
+
+  <button id="copyBtn" class="btn">Copier la sélection</button>
+  
+  <div id="status">Prêt</div>
+  
+  <div id="videoList"></div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>
