@@ -16,8 +16,11 @@ document.getElementById('startBtn').addEventListener('click', async () => {
     
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
-    if (!tab.url || !tab.url.includes("youtube.com/results")) {
-        status.textContent = "Erreur : Allez sur une recherche YouTube.";
+    const isSearchPage = tab.url && tab.url.includes("youtube.com/results");
+    const isPlaylistPage = tab.url && tab.url.includes("youtube.com/playlist");
+
+    if (!isSearchPage && !isPlaylistPage) {
+        status.textContent = "Erreur : Allez sur une recherche ou playlist YouTube.";
         status.style.color = "#d32f2f";
         return;
     }

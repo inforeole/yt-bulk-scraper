@@ -4,26 +4,104 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         scrapeYouTube(request.limit).then(data => {
             sendResponse({ status: "DONE", data: data });
         });
-        return true; 
+        return true;
     }
 });
 
+function detectPageType() {
+    const url = window.location.href;
+    if (url.includes('/results')) return 'search';
+    if (url.includes('/playlist')) return 'playlist';
+    return 'unknown';
+}
+
 async function scrapeYouTube(limit) {
+    const pageType = detectPageType();
+
+    if (pageType === 'playlist') {
+        return await scrapePlaylist(limit);
+    } else {
+        return await scrapeSearch(limit);
+    }
+}
+
+async function scrapePlaylist(limit) {
     let videosMap = new Map();
     let noChangeCount = 0;
-    
+
+    const extract = () => {
+        const renderers = document.querySelectorAll('ytd-playlist-video-renderer');
+
+        renderers.forEach((renderer, index) => {
+            const linkTag = renderer.querySelector('a#video-title');
+            if (!linkTag) return;
+
+            const href = linkTag.href;
+            if (href && href.includes('/watch?v=')) {
+                // Nettoyer l'URL (garder seulement la partie video)
+                const urlObj = new URL(href);
+                const videoId = urlObj.searchParams.get('v');
+                const cleanUrl = `https://www.youtube.com/watch?v=${videoId}`;
+
+                const title = (linkTag.getAttribute('title') || linkTag.innerText).trim();
+
+                // Index dans la playlist (position)
+                const indexSpan = renderer.querySelector('#index');
+                const position = indexSpan ? indexSpan.innerText.trim() : String(index + 1);
+
+                if (!videosMap.has(cleanUrl)) {
+                    videosMap.set(cleanUrl, {
+                        url: cleanUrl,
+                        title: title,
+                        dateText: `#${position}`,
+                        timestamp: Date.now() - index // Pour garder l'ordre de la playlist
+                    });
+                }
+            }
+        });
+    };
+
+    extract();
+
+    while (videosMap.size < limit) {
+        const previousSize = videosMap.size;
+        window.scrollTo(0, document.documentElement.scrollHeight);
+        await new Promise(r => setTimeout(r, 1500));
+
+        extract();
+
+        if (videosMap.size === previousSize) {
+            noChangeCount++;
+            if (noChangeCount > 2) break;
+        } else {
+            noChangeCount = 0;
+        }
+    }
+
+    // Pour les playlists, on garde l'ordre original (par position)
+    const sortedResults = Array.from(videosMap.values())
+        .sort((a, b) => b.timestamp - a.timestamp)
+        .slice(0, limit);
+
+    return sortedResults;
+}
+
+async function scrapeSearch(limit) {
+    let videosMap = new Map();
+    let noChangeCount = 0;
+
     const extract = () => {
         const renderers = document.querySelectorAll('ytd-video-renderer');
-        
+
         renderers.forEach(renderer => {
             const linkTag = renderer.querySelector('a#video-title');
             if (!linkTag) return;
-            
+
             const href = linkTag.href;
             if (href && href.includes('/watch?v=')) {
                 const cleanUrl = href.split('&')[0];
                 const title = (linkTag.getAttribute('title') || linkTag.innerText).trim();
-                
+
                 // Extraction de la date
                 let dateText = "";
                 const metaSpans = renderer.querySelectorAll('#metadata-line > span');
@@ -34,17 +112,15 @@ async function scrapeYouTube(limit) {
                 }
 
                 // NETTOYAGE DE LA DATE
-                // On retire "il y a " et "Diffusé " (et les espaces autour)
                 let cleanDateText = dateText
                     .replace(/il y a\s*/i, '')
                     .replace(/Diffusé\s*/i, '')
                     .trim();
 
                 if (!videosMap.has(cleanUrl)) {
-                    videosMap.set(cleanUrl, { 
-                        url: cleanUrl, 
-                        title: title, 
-                        // On utilise le texte nettoyé pour l'affichage
+                    videosMap.set(cleanUrl, {
+                        url: cleanUrl,
+                        title: title,
                         dateText: cleanDateText,
                         timestamp: convertRelativeDateToTimestamp(dateText)
                     });
@@ -59,9 +135,9 @@ async function scrapeYouTube(limit) {
         const previousHeight = document.documentElement.scrollHeight;
         window.scrollTo(0, document.documentElement.scrollHeight);
         await new Promise(r => setTimeout(r, 1500));
-        
+
         extract();
-        
+
         const newHeight = document.documentElement.scrollHeight;
         if (newHeight === previousHeight) {
             noChangeCount++;
