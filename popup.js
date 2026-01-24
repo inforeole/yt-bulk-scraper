@@ -13,14 +13,15 @@ document.getElementById('startBtn').addEventListener('click', async () => {
     copyBtn.style.display = 'none';
     filterContainer.style.display = 'none';
     status.textContent = "Initialisation...";
-    
+
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
     const isSearchPage = tab.url && tab.url.includes("youtube.com/results");
     const isPlaylistPage = tab.url && tab.url.includes("youtube.com/playlist");
+    const isChannelPage = tab.url && tab.url.includes("youtube.com/@");
 
-    if (!isSearchPage && !isPlaylistPage) {
-        status.textContent = "Erreur : Allez sur une recherche ou playlist YouTube.";
+    if (!isSearchPage && !isPlaylistPage && !isChannelPage) {
+        status.textContent = "Erreur : Allez sur une recherche, playlist ou chaîne YouTube.";
         status.style.color = "#d32f2f";
         return;
     }
@@ -37,11 +38,11 @@ document.getElementById('startBtn').addEventListener('click', async () => {
                 files: ['content.js']
             });
         } catch (e) { }
-        
+
         await new Promise(r => setTimeout(r, 500));
 
         const response = await chrome.tabs.sendMessage(tab.id, { action: "SCRAPE_URLS", limit: 50 });
-        
+
         if (response && response.status === "DONE") {
             allVideos = response.data;
             filterContainer.style.display = 'block';
@@ -69,14 +70,14 @@ function renderList(videos) {
     videos.forEach((video, index) => {
         const row = document.createElement('div');
         row.className = 'video-item';
-        
+
         // Case à cocher
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
         checkbox.checked = true;
         checkbox.id = `vid-${index}`;
         checkbox.dataset.url = video.url;
-        
+
         // Conteneur Texte (Titre + Date)
         const contentDiv = document.createElement('div');
         contentDiv.className = 'video-content';
@@ -92,10 +93,10 @@ function renderList(videos) {
 
         contentDiv.appendChild(label);
         contentDiv.appendChild(dateSpan);
-        
+
         row.appendChild(checkbox);
         row.appendChild(contentDiv);
-        
+
         listContainer.appendChild(row);
     });
 }

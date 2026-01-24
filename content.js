@@ -12,6 +12,7 @@ function detectPageType() {
     const url = window.location.href;
     if (url.includes('/results')) return 'search';
     if (url.includes('/playlist')) return 'playlist';
+    if (url.includes('/@')) return 'channel';
     return 'unknown';
 }
 
@@ -20,6 +21,8 @@ async function scrapeYouTube(limit) {
 
     if (pageType === 'playlist') {
         return await scrapePlaylist(limit);
+    } else if (pageType === 'channel') {
+        return await scrapeChannel(limit);
     } else {
         return await scrapeSearch(limit);
     }
@@ -79,6 +82,93 @@ async function scrapePlaylist(limit) {
     }
 
     // Pour les playlists, on garde l'ordre original (par position)
+    const sortedResults = Array.from(videosMap.values())
+        .sort((a, b) => b.timestamp - a.timestamp)
+        .slice(0, limit);
+
+    return sortedResults;
+}
+
+async function scrapeChannel(limit) {
+    let videosMap = new Map();
+    let noChangeCount = 0;
+
+    const extract = () => {
+        // Les pages de chaîne utilisent ytd-rich-item-renderer pour la grille
+        const renderers = document.querySelectorAll('ytd-rich-item-renderer');
+
+        renderers.forEach((renderer, index) => {
+            // Le lien vidéo peut être dans différents endroits selon le layout
+            const linkTag = renderer.querySelector('a#video-title-link') ||
+                           renderer.querySelector('a#video-title') ||
+                           renderer.querySelector('a[href*="/watch?v="]');
+            if (!linkTag) return;
+
+            const href = linkTag.href;
+            if (href && href.includes('/watch?v=')) {
+                const urlObj = new URL(href);
+                const videoId = urlObj.searchParams.get('v');
+                const cleanUrl = `https://www.youtube.com/watch?v=${videoId}`;
+
+                // Titre: essayer plusieurs sélecteurs
+                const titleEl = renderer.querySelector('#video-title') ||
+                               renderer.querySelector('yt-formatted-string#video-title');
+                const title = titleEl ? (titleEl.getAttribute('title') || titleEl.innerText).trim() : '';
+
+                // Date de publication
+                let dateText = "";
+                const metadataLine = renderer.querySelector('#metadata-line');
+                if (metadataLine) {
+                    const spans = metadataLine.querySelectorAll('span');
+                    // Généralement: "X vues • il y a Y jours" ou spans séparés
+                    spans.forEach(span => {
+                        const text = span.innerText;
+                        if (text.includes('il y a') || text.includes('ago') ||
+                            text.includes('jour') || text.includes('day') ||
+                            text.includes('semaine') || text.includes('week') ||
+                            text.includes('mois') || text.includes('month') ||
+                            text.includes('an') || text.includes('year') ||
+                            text.includes('heure') || text.includes('hour')) {
+                            dateText = text;
+                        }
+                    });
+                }
+
+                let cleanDateText = dateText
+                    .replace(/il y a\s*/i, '')
+                    .replace(/Diffusé\s*/i, '')
+                    .replace(/Streamed\s*/i, '')
+                    .trim();
+
+                if (!videosMap.has(cleanUrl)) {
+                    videosMap.set(cleanUrl, {
+                        url: cleanUrl,
+                        title: title,
+                        dateText: cleanDateText,
+                        timestamp: convertRelativeDateToTimestamp(dateText)
+                    });
+                }
+            }
+        });
+    };
+
+    extract();
+
+    while (videosMap.size < limit) {
+        const previousSize = videosMap.size;
+        window.scrollTo(0, document.documentElement.scrollHeight);
+        await new Promise(r => setTimeout(r, 1500));
+
+        extract();
+
+        if (videosMap.size === previousSize) {
+            noChangeCount++;
+            if (noChangeCount > 2) break;
+        } else {
+            noChangeCount = 0;
+        }
+    }
+
     const sortedResults = Array.from(videosMap.values())
         .sort((a, b) => b.timestamp - a.timestamp)
         .slice(0, limit);

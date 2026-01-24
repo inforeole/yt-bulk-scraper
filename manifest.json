@@ -11,7 +11,8 @@
     {
       "matches": [
         "*://*.youtube.com/results*",
-        "*://*.youtube.com/playlist*"
+        "*://*.youtube.com/playlist*",
+        "*://*.youtube.com/@*"
       ],
       "js": ["content.js"]
     }
